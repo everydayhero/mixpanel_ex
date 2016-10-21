@@ -18,19 +18,32 @@ defmodule Mixpanel.Client do
     GenServer.cast(:mixpanel_client, {:track, event, properties})
   end
 
+  def track(events) when is_list(events) do
+    GenServer.cast(:mixpanel_client, {:track, events})
+  end
+
   def handle_cast({:track, event, properties}, state)  do
     properties = Dict.put(properties, :token, state.token)
-    {:ok, json} = JSX.encode([event: event, properties: properties])
-    body = String.to_char_list("data=#{ :base64.encode(json) }")
+    {:ok, json} = JSX.encode(event: event, properties: properties)
+    post_track(json, state.connection)
+    {:noreply, state}
+  end
 
+  def handle_cast({:track, events}, state) when is_list(events) do
+    events = Enum.map(events, &put_in(&1, [:properties, :token], state.token))
+    {:ok, json} = JSX.encode(events)
+    post_track(json, state.connection)
+    {:noreply, state}
+  end
+
+  def post_track(json, connection) do
+    IO.puts("Posting JSON: #{json}")
+    body = String.to_char_list("data=#{ :base64.encode(json) }")
     request = {@events_endpoint, _headers = [], _content_type = 'text/plain', body}
-    result = :httpc.request(:post, request, _http_opts=[], _opts=[], state.connection)
+    result = :httpc.request(:post, request, _http_opts=[], _opts=[], connection)
     case result do
       {:ok, {_, _, @success_response_body}} -> :ok
       _ -> Logger.warn("Problem tracking mixpanel event: " <> inspect(result))
     end
-
-    {:noreply, state}
   end
 end
-

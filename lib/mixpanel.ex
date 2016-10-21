@@ -16,9 +16,15 @@ defmodule Mixpanel do
     Supervisor.start_link(children, opts)
   end
 
-  def track(event, properties \\ [], timestamp \\ nil) do
+  def track(event, properties, timestamp \\ nil) do
     properties = Mixpanel.Util.add_timestamp(properties, timestamp)
     Mixpanel.Client.track(event, properties)
+    :ok
+  end
+
+  def track(event) when is_binary(event), do: track(event, [])
+  def track(events) when is_list(events) do
+    Mixpanel.Client.track(events)
     :ok
   end
 
@@ -33,4 +39,3 @@ defmodule Mixpanel do
   end
 
 end
-
